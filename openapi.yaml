@@ -1,0 +1,394 @@
+openapi: 3.1.0
+info:
+  title: Kova Mind API
+  version: 1.0.0
+  description: |
+    Memory-as-a-service API for AI agents. Extract, retrieve, reinforce, and analyze
+    memory patterns from conversations.
+
+    ## Authentication
+    All endpoints (except `/health`) require a Bearer token:
+    ```
+    Authorization: Bearer km_live_xxxxxxxxxxxxxxxx
+    ```
+
+    Get your API key at [kovamind.ai](https://kovamind.ai).
+
+    ## Rate limits
+    | Endpoint | Free | Paid |
+    |----------|------|------|
+    | /memory/extract | 100/day | 10,000/day |
+    | /memory/retrieve | 200/day | 20,000/day |
+    | /memory/surprise | 500/day | Unlimited |
+
+  contact:
+    name: Kova Mind
+    email: hello@kovamind.ai
+    url: https://kovamind.ai
+  license:
+    name: MIT
+
+servers:
+  - url: https://api.kovamind.ai
+    description: Production
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: "km_live_xxx"
+      description: "Your Kova Mind API key (starts with km_live_ or km_test_)"
+
+  schemas:
+    Message:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant, system]
+          description: The role of the message sender
+        content:
+          type: string
+          maxLength: 10000
+          description: The message content (max 10,000 characters)
+
+    Pattern:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique pattern identifier
+        pattern:
+          type: string
+          description: The extracted memory pattern text
+        category:
+          type: string
+          enum: [preference, entity, decision, procedure, emotion, belief, relationship]
+          description: Category of the pattern
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confidence score (0.0 to 1.0)
+        user_id:
+          type: string
+          description: The user this pattern belongs to
+        tenant_id:
+          type: string
+          description: The tenant/organization this pattern belongs to
+
+    ExtractRequest:
+      type: object
+      required: [conversation, user_id]
+      properties:
+        conversation:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+          description: List of conversation messages to extract patterns from
+        user_id:
+          type: string
+          description: Unique identifier for the user whose memory is being updated
+        session_id:
+          type: string
+          description: Optional session ID for grouping extractions across multiple calls
+
+    ExtractResponse:
+      type: object
+      properties:
+        patterns:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pattern'
+          description: List of extracted memory patterns
+
+    RetrieveRequest:
+      type: object
+      required: [context, user_id]
+      properties:
+        context:
+          type: string
+          description: Natural language context or query to search memories for
+        user_id:
+          type: string
+          description: The user whose memory to search
+        max_patterns:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+          description: Maximum number of patterns to return
+        min_confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          default: 0.3
+          description: Minimum confidence threshold for returned patterns
+
+    RetrieveResponse:
+      type: object
+      properties:
+        patterns:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pattern'
+          description: List of relevant memory patterns, ranked by relevance
+
+    ReinforceRequest:
+      type: object
+      required: [pattern_id, reinforcement_type]
+      properties:
+        pattern_id:
+          type: string
+          description: The ID of the pattern to reinforce
+        reinforcement_type:
+          type: string
+          enum: [confirmed, denied, strengthened, weakened]
+          description: |
+            Type of reinforcement:
+            - `confirmed`: User validated this pattern is correct
+            - `denied`: User said this pattern is wrong
+            - `strengthened`: Increase confidence
+            - `weakened`: Decrease confidence
+        context:
+          type: string
+          description: Optional explanation for the reinforcement
+
+    ReinforceResponse:
+      type: object
+      properties:
+        pattern_id:
+          type: string
+        type:
+          type: string
+        success:
+          type: boolean
+
+    SurpriseRequest:
+      type: object
+      required: [content, user_id]
+      properties:
+        content:
+          type: string
+          description: The new content to evaluate for novelty
+        user_id:
+          type: string
+          description: The user whose memory to compare against
+
+    SurpriseResponse:
+      type: object
+      properties:
+        surprise_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: |
+            How novel the content is (0.0 to 1.0):
+            - < 0.3: Already known (reinforce)
+            - 0.3–0.7: New information (update)
+            - > 0.7: Contradicts existing memory (contradict)
+        route:
+          type: string
+          enum: [reinforce, update, contradict]
+          description: Recommended action based on surprise score
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+        version:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Human-readable error message
+
+paths:
+  /memory/extract:
+    post:
+      operationId: extractMemory
+      summary: Extract memory patterns from a conversation
+      description: |
+        Parses conversation messages and extracts structured memory patterns
+        (preferences, entities, decisions, procedures, emotions, etc.).
+        Patterns are stored and associated with the given user_id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtractRequest'
+            example:
+              conversation:
+                - role: user
+                  content: "I love dark mode and hate Comic Sans. I live in Miami."
+                - role: assistant
+                  content: "Noted! I'll remember your preferences."
+              user_id: "alex"
+      responses:
+        '200':
+          description: Patterns extracted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractResponse'
+              example:
+                patterns:
+                  - id: "42"
+                    pattern: "prefers dark mode"
+                    category: "preference"
+                    confidence: 0.95
+                    user_id: "alex"
+                  - id: "43"
+                    pattern: "dislikes Comic Sans"
+                    category: "preference"
+                    confidence: 0.90
+                    user_id: "alex"
+                  - id: "44"
+                    pattern: "lives in Miami"
+                    category: "entity"
+                    confidence: 0.92
+                    user_id: "alex"
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+
+  /memory/retrieve:
+    post:
+      operationId: retrieveMemory
+      summary: Retrieve relevant memory patterns
+      description: |
+        Search stored memory patterns using natural language context.
+        Returns the most relevant patterns ranked by similarity and confidence.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetrieveRequest'
+            example:
+              context: "User is asking about their text editor preferences"
+              user_id: "alex"
+              max_patterns: 5
+              min_confidence: 0.5
+      responses:
+        '200':
+          description: Relevant patterns retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetrieveResponse'
+              example:
+                patterns:
+                  - id: "42"
+                    pattern: "prefers dark mode"
+                    category: "preference"
+                    confidence: 0.95
+                    user_id: "alex"
+        '401':
+          description: Invalid or missing API key
+        '429':
+          description: Rate limit exceeded
+
+  /memory/reinforce:
+    post:
+      operationId: reinforceMemory
+      summary: Reinforce or deny a stored pattern
+      description: |
+        Confirm, deny, strengthen, or weaken a previously stored memory pattern.
+        Use this when a user explicitly validates or contradicts a memory.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReinforceRequest'
+            example:
+              pattern_id: "42"
+              reinforcement_type: "confirmed"
+              context: "User explicitly confirmed they prefer dark mode"
+      responses:
+        '200':
+          description: Pattern reinforced successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReinforceResponse'
+        '401':
+          description: Invalid or missing API key
+        '404':
+          description: Pattern not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /memory/surprise:
+    post:
+      operationId: scoreSurprise
+      summary: Score how surprising new content is
+      description: |
+        Evaluate how novel or contradictory new content is compared to existing
+        memories for a user. High scores indicate the content contradicts stored
+        knowledge; low scores indicate it reinforces what's already known.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SurpriseRequest'
+            example:
+              content: "Alex now prefers light mode"
+              user_id: "alex"
+      responses:
+        '200':
+          description: Surprise score calculated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SurpriseResponse'
+              example:
+                surprise_score: 0.82
+                route: "contradict"
+        '401':
+          description: Invalid or missing API key
+
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Check API health
+      description: Returns the current health status of the API. No authentication required.
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "ok"
+                version: "1.0.0"
