@@ -8,6 +8,7 @@ API reference, OpenAPI spec, and integration guides for the [Kova Mind](https://
 |----------|-------------|
 | [OpenAPI Spec](./openapi.yaml) | Full API specification (OpenAPI 3.1) |
 | [REST API Reference](./api-reference.md) | Endpoint docs with curl examples |
+| [Vault v2 API Reference](./vault-v2-api-reference.md) | Secure credential storage with opaque handles |
 | [ChatGPT Custom GPT Guide](./chatgpt-gpt-action.md) | Give any GPT persistent memory |
 
 ## SDKs

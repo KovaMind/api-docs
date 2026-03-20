@@ -2,61 +2,74 @@ openapi: 3.1.0
 info:
   title: Kova Mind API
   version: 1.0.0
-  description: |
-    Memory-as-a-service API for AI agents. Extract, retrieve, reinforce, and analyze
+  description: 'Memory-as-a-service API for AI agents. Extract, retrieve, reinforce, and analyze
+
     memory patterns from conversations.
 
+
     ## Authentication
+
     All endpoints (except `/health`) require a Bearer token:
+
     ```
+
     Authorization: Bearer km_live_xxxxxxxxxxxxxxxx
+
     ```
+
 
     Get your API key at [kovamind.ai](https://kovamind.ai).
 
+
     ## Rate limits
+
     | Endpoint | Free | Paid |
+
     |----------|------|------|
+
     | /memory/extract | 100/day | 10,000/day |
+
     | /memory/retrieve | 200/day | 20,000/day |
+
     | /memory/surprise | 500/day | Unlimited |
 
+    '
   contact:
     name: Kova Mind
     email: hello@kovamind.ai
     url: https://kovamind.ai
   license:
     name: MIT
-
 servers:
-  - url: https://api.kovamind.ai
-    description: Production
-
+- url: https://api.kovamind.ai
+  description: Production
 security:
-  - bearerAuth: []
-
+- bearerAuth: []
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: "km_live_xxx"
-      description: "Your Kova Mind API key (starts with km_live_ or km_test_)"
-
+      bearerFormat: km_live_xxx
+      description: Your Kova Mind API key (starts with km_live_ or km_test_)
   schemas:
     Message:
       type: object
-      required: [role, content]
+      required:
+      - role
+      - content
       properties:
         role:
           type: string
-          enum: [user, assistant, system]
+          enum:
+          - user
+          - assistant
+          - system
           description: The role of the message sender
         content:
           type: string
           maxLength: 10000
           description: The message content (max 10,000 characters)
-
     Pattern:
       type: object
       properties:
@@ -68,7 +81,14 @@ components:
           description: The extracted memory pattern text
         category:
           type: string
-          enum: [preference, entity, decision, procedure, emotion, belief, relationship]
+          enum:
+          - preference
+          - entity
+          - decision
+          - procedure
+          - emotion
+          - belief
+          - relationship
           description: Category of the pattern
         confidence:
           type: number
@@ -82,10 +102,11 @@ components:
         tenant_id:
           type: string
           description: The tenant/organization this pattern belongs to
-
     ExtractRequest:
       type: object
-      required: [conversation, user_id]
+      required:
+      - conversation
+      - user_id
       properties:
         conversation:
           type: array
@@ -98,7 +119,6 @@ components:
         session_id:
           type: string
           description: Optional session ID for grouping extractions across multiple calls
-
     ExtractResponse:
       type: object
       properties:
@@ -107,10 +127,11 @@ components:
           items:
             $ref: '#/components/schemas/Pattern'
           description: List of extracted memory patterns
-
     RetrieveRequest:
       type: object
-      required: [context, user_id]
+      required:
+      - context
+      - user_id
       properties:
         context:
           type: string
@@ -131,7 +152,6 @@ components:
           maximum: 1
           default: 0.3
           description: Minimum confidence threshold for returned patterns
-
     RetrieveResponse:
       type: object
       properties:
@@ -140,27 +160,36 @@ components:
           items:
             $ref: '#/components/schemas/Pattern'
           description: List of relevant memory patterns, ranked by relevance
-
     ReinforceRequest:
       type: object
-      required: [pattern_id, reinforcement_type]
+      required:
+      - pattern_id
+      - reinforcement_type
       properties:
         pattern_id:
           type: string
           description: The ID of the pattern to reinforce
         reinforcement_type:
           type: string
-          enum: [confirmed, denied, strengthened, weakened]
-          description: |
-            Type of reinforcement:
+          enum:
+          - confirmed
+          - denied
+          - strengthened
+          - weakened
+          description: 'Type of reinforcement:
+
             - `confirmed`: User validated this pattern is correct
+
             - `denied`: User said this pattern is wrong
+
             - `strengthened`: Increase confidence
+
             - `weakened`: Decrease confidence
+
+            '
         context:
           type: string
           description: Optional explanation for the reinforcement
-
     ReinforceResponse:
       type: object
       properties:
@@ -170,10 +199,11 @@ components:
           type: string
         success:
           type: boolean
-
     SurpriseRequest:
       type: object
-      required: [content, user_id]
+      required:
+      - content
+      - user_id
       properties:
         content:
           type: string
@@ -181,7 +211,6 @@ components:
         user_id:
           type: string
           description: The user whose memory to compare against
-
     SurpriseResponse:
       type: object
       properties:
@@ -190,41 +219,269 @@ components:
           format: float
           minimum: 0
           maximum: 1
-          description: |
-            How novel the content is (0.0 to 1.0):
+          description: 'How novel the content is (0.0 to 1.0):
+
             - < 0.3: Already known (reinforce)
+
             - 0.3–0.7: New information (update)
+
             - > 0.7: Contradicts existing memory (contradict)
+
+            '
         route:
           type: string
-          enum: [reinforce, update, contradict]
+          enum:
+          - reinforce
+          - update
+          - contradict
           description: Recommended action based on surprise score
-
     HealthResponse:
       type: object
       properties:
         status:
           type: string
-          enum: [ok, degraded, down]
+          enum:
+          - ok
+          - degraded
+          - down
         version:
           type: string
-
     Error:
       type: object
       properties:
         detail:
           type: string
           description: Human-readable error message
-
+    VaultSetupRequest:
+      type: object
+      required:
+      - passphrase
+      properties:
+        passphrase:
+          type: string
+          minLength: 12
+          description: Passphrase used to derive the vault encryption key
+    VaultSetupResponse:
+      type: object
+      properties:
+        recovery_words:
+          type: array
+          items:
+            type: string
+          minItems: 12
+          maxItems: 12
+          description: 12-word BIP-39 recovery phrase (shown only once)
+        vault_id:
+          type: string
+          description: Unique vault identifier
+        status:
+          type: string
+          enum:
+          - initialized
+          description: Vault status after setup
+    VaultUnlockRequest:
+      type: object
+      required:
+      - passphrase
+      properties:
+        passphrase:
+          type: string
+          description: Vault passphrase
+    VaultSessionResponse:
+      type: object
+      properties:
+        vault_id:
+          type: string
+          description: Vault identifier
+        status:
+          type: string
+          enum:
+          - unlocked
+          - locked
+          description: Current vault status
+        expires_at:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the session auto-locks
+    CredentialStoreRequest:
+      type: object
+      required:
+      - name
+      - type
+      - value
+      properties:
+        name:
+          type: string
+          description: Human-readable credential name
+        type:
+          type: string
+          enum:
+          - api_key
+          - oauth_token
+          - password
+          - certificate
+          - ssh_key
+          - other
+          description: Credential type
+        value:
+          type: string
+          description: The secret value to store (encrypted at rest, never returned)
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Arbitrary key-value metadata (not encrypted, used for search/filtering)
+    Credential:
+      type: object
+      description: Credential metadata. Never contains the plaintext secret value.
+      properties:
+        id:
+          type: string
+          description: Credential identifier
+        handle:
+          type: string
+          description: Opaque handle for execution and reference
+        name:
+          type: string
+          description: Credential name
+        type:
+          type: string
+          enum:
+          - api_key
+          - oauth_token
+          - password
+          - certificate
+          - ssh_key
+          - other
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+    CredentialListResponse:
+      type: object
+      properties:
+        credentials:
+          type: array
+          items:
+            $ref: '#/components/schemas/Credential'
+          description: List of credentials (metadata only, no plaintext values)
+    CredentialDeleteResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        deleted:
+          type: boolean
+    Handle:
+      type: object
+      properties:
+        handle:
+          type: string
+          description: Opaque handle string
+        credential_id:
+          type: string
+          description: Associated credential ID
+        name:
+          type: string
+          description: Credential name
+        type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    HandleListResponse:
+      type: object
+      properties:
+        handles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Handle'
+    FindResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Credential'
+          description: Matching credentials (metadata only, no plaintext values)
+    ExecuteRequest:
+      type: object
+      required:
+      - handle
+      - action
+      - params
+      properties:
+        handle:
+          type: string
+          description: Opaque handle referencing the credential
+        action:
+          type: string
+          enum:
+          - http_request
+          - smtp_send
+          - dns_lookup
+          - custom
+          description: Action type to execute
+        params:
+          type: object
+          description: Action-specific parameters
+    ExecuteResponse:
+      type: object
+      properties:
+        execution_id:
+          type: string
+          description: Unique execution identifier
+        handle:
+          type: string
+        action:
+          type: string
+        status:
+          type: string
+          enum:
+          - success
+          - error
+          description: Execution result status
+        result:
+          type: object
+          description: Action-specific result payload
+        executed_at:
+          type: string
+          format: date-time
+    RecoverRequest:
+      type: object
+      required:
+      - recovery_words
+      - new_passphrase
+      properties:
+        recovery_words:
+          type: array
+          items:
+            type: string
+          minItems: 12
+          maxItems: 12
+          description: The 12-word recovery phrase from initial setup
+        new_passphrase:
+          type: string
+          minLength: 12
+          description: New passphrase to set
 paths:
   /memory/extract:
     post:
       operationId: extractMemory
       summary: Extract memory patterns from a conversation
-      description: |
-        Parses conversation messages and extracts structured memory patterns
+      description: 'Parses conversation messages and extracts structured memory patterns
+
         (preferences, entities, decisions, procedures, emotions, etc.).
+
         Patterns are stored and associated with the given user_id.
+
+        '
       requestBody:
         required: true
         content:
@@ -233,11 +490,11 @@ paths:
               $ref: '#/components/schemas/ExtractRequest'
             example:
               conversation:
-                - role: user
-                  content: "I love dark mode and hate Comic Sans. I live in Miami."
-                - role: assistant
-                  content: "Noted! I'll remember your preferences."
-              user_id: "alex"
+              - role: user
+                content: I love dark mode and hate Comic Sans. I live in Miami.
+              - role: assistant
+                content: Noted! I'll remember your preferences.
+              user_id: alex
       responses:
         '200':
           description: Patterns extracted successfully
@@ -247,21 +504,21 @@ paths:
                 $ref: '#/components/schemas/ExtractResponse'
               example:
                 patterns:
-                  - id: "42"
-                    pattern: "prefers dark mode"
-                    category: "preference"
-                    confidence: 0.95
-                    user_id: "alex"
-                  - id: "43"
-                    pattern: "dislikes Comic Sans"
-                    category: "preference"
-                    confidence: 0.90
-                    user_id: "alex"
-                  - id: "44"
-                    pattern: "lives in Miami"
-                    category: "entity"
-                    confidence: 0.92
-                    user_id: "alex"
+                - id: '42'
+                  pattern: prefers dark mode
+                  category: preference
+                  confidence: 0.95
+                  user_id: alex
+                - id: '43'
+                  pattern: dislikes Comic Sans
+                  category: preference
+                  confidence: 0.9
+                  user_id: alex
+                - id: '44'
+                  pattern: lives in Miami
+                  category: entity
+                  confidence: 0.92
+                  user_id: alex
         '401':
           description: Invalid or missing API key
           content:
@@ -275,14 +532,15 @@ paths:
               schema:
                 type: integer
               description: Seconds to wait before retrying
-
   /memory/retrieve:
     post:
       operationId: retrieveMemory
       summary: Retrieve relevant memory patterns
-      description: |
-        Search stored memory patterns using natural language context.
+      description: 'Search stored memory patterns using natural language context.
+
         Returns the most relevant patterns ranked by similarity and confidence.
+
+        '
       requestBody:
         required: true
         content:
@@ -290,8 +548,8 @@ paths:
             schema:
               $ref: '#/components/schemas/RetrieveRequest'
             example:
-              context: "User is asking about their text editor preferences"
-              user_id: "alex"
+              context: User is asking about their text editor preferences
+              user_id: alex
               max_patterns: 5
               min_confidence: 0.5
       responses:
@@ -303,23 +561,24 @@ paths:
                 $ref: '#/components/schemas/RetrieveResponse'
               example:
                 patterns:
-                  - id: "42"
-                    pattern: "prefers dark mode"
-                    category: "preference"
-                    confidence: 0.95
-                    user_id: "alex"
+                - id: '42'
+                  pattern: prefers dark mode
+                  category: preference
+                  confidence: 0.95
+                  user_id: alex
         '401':
           description: Invalid or missing API key
         '429':
           description: Rate limit exceeded
-
   /memory/reinforce:
     post:
       operationId: reinforceMemory
       summary: Reinforce or deny a stored pattern
-      description: |
-        Confirm, deny, strengthen, or weaken a previously stored memory pattern.
+      description: 'Confirm, deny, strengthen, or weaken a previously stored memory pattern.
+
         Use this when a user explicitly validates or contradicts a memory.
+
+        '
       requestBody:
         required: true
         content:
@@ -327,9 +586,9 @@ paths:
             schema:
               $ref: '#/components/schemas/ReinforceRequest'
             example:
-              pattern_id: "42"
-              reinforcement_type: "confirmed"
-              context: "User explicitly confirmed they prefer dark mode"
+              pattern_id: '42'
+              reinforcement_type: confirmed
+              context: User explicitly confirmed they prefer dark mode
       responses:
         '200':
           description: Pattern reinforced successfully
@@ -345,15 +604,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-
   /memory/surprise:
     post:
       operationId: scoreSurprise
       summary: Score how surprising new content is
-      description: |
-        Evaluate how novel or contradictory new content is compared to existing
+      description: 'Evaluate how novel or contradictory new content is compared to existing
+
         memories for a user. High scores indicate the content contradicts stored
-        knowledge; low scores indicate it reinforces what's already known.
+
+        knowledge; low scores indicate it reinforces what''s already known.
+
+        '
       requestBody:
         required: true
         content:
@@ -361,8 +622,8 @@ paths:
             schema:
               $ref: '#/components/schemas/SurpriseRequest'
             example:
-              content: "Alex now prefers light mode"
-              user_id: "alex"
+              content: Alex now prefers light mode
+              user_id: alex
       responses:
         '200':
           description: Surprise score calculated
@@ -372,10 +633,9 @@ paths:
                 $ref: '#/components/schemas/SurpriseResponse'
               example:
                 surprise_score: 0.82
-                route: "contradict"
+                route: contradict
         '401':
           description: Invalid or missing API key
-
   /health:
     get:
       operationId: healthCheck
@@ -390,5 +650,252 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
               example:
-                status: "ok"
-                version: "1.0.0"
+                status: ok
+                version: 1.0.0
+  /vault/v2/setup:
+    post:
+      operationId: vaultSetup
+      summary: First-time vault setup
+      description: Initialize the vault with a passphrase. Returns a 12-word recovery phrase (shown only once). Must be called
+        before any other vault endpoint.
+      tags:
+      - Vault v2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VaultSetupRequest'
+      responses:
+        '200':
+          description: Vault initialized successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultSetupResponse'
+        '401':
+          description: Invalid or missing API key
+        '409':
+          description: Vault already initialized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /vault/v2/unlock:
+    post:
+      operationId: vaultUnlock
+      summary: Unlock vault with passphrase
+      description: Unlock the vault for the current session. The derived encryption key is held in memory until lock or session
+        expiry.
+      tags:
+      - Vault v2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VaultUnlockRequest'
+      responses:
+        '200':
+          description: Vault unlocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultSessionResponse'
+        '401':
+          description: Invalid or missing API key
+        '403':
+          description: Incorrect passphrase
+  /vault/v2/lock:
+    post:
+      operationId: vaultLock
+      summary: Lock vault, zero key from memory
+      description: Lock the vault immediately. Zeros the encryption key from server memory.
+      tags:
+      - Vault v2
+      responses:
+        '200':
+          description: Vault locked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultSessionResponse'
+        '401':
+          description: Invalid or missing API key
+  /vault/v2/credentials:
+    post:
+      operationId: storeCredential
+      summary: Store credential, returns opaque handle
+      description: Store a credential in the vault. Returns an opaque handle. The plaintext value is never returned by any
+        endpoint after storage.
+      tags:
+      - Vault v2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CredentialStoreRequest'
+      responses:
+        '200':
+          description: Credential stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Credential'
+        '401':
+          description: Invalid or missing API key
+        '403':
+          description: Vault is locked
+    get:
+      operationId: listCredentials
+      summary: List credentials (metadata only)
+      description: List all stored credentials. Returns metadata only — no plaintext values are ever included.
+      tags:
+      - Vault v2
+      responses:
+        '200':
+          description: Credential list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialListResponse'
+        '401':
+          description: Invalid or missing API key
+        '403':
+          description: Vault is locked
+  /vault/v2/credentials/{id}:
+    delete:
+      operationId: deleteCredential
+      summary: Delete a credential
+      description: Permanently delete a credential. This action is irreversible.
+      tags:
+      - Vault v2
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Credential ID to delete
+      responses:
+        '200':
+          description: Credential deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialDeleteResponse'
+        '401':
+          description: Invalid or missing API key
+        '403':
+          description: Vault is locked
+        '404':
+          description: Credential not found
+  /vault/v2/handles:
+    get:
+      operationId: listHandles
+      summary: List opaque handles
+      description: List all opaque handles. Handles are tokens agents use to reference credentials without seeing the underlying
+        secret.
+      tags:
+      - Vault v2
+      responses:
+        '200':
+          description: Handle list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HandleListResponse'
+        '401':
+          description: Invalid or missing API key
+        '403':
+          description: Vault is locked
+  /vault/v2/find:
+    get:
+      operationId: findCredentials
+      summary: Find credentials by query
+      description: Search credentials by name, type, or metadata fields. Returns metadata only — no plaintext values.
+      tags:
+      - Vault v2
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Free-text search across name and metadata values
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - api_key
+          - oauth_token
+          - password
+          - certificate
+          - ssh_key
+          - other
+        description: Filter by credential type
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindResponse'
+        '401':
+          description: Invalid or missing API key
+        '403':
+          description: Vault is locked
+  /vault/v2/execute:
+    post:
+      operationId: executeWithCredential
+      summary: Execute action using credential
+      description: Execute an action using a stored credential. The server resolves the opaque handle to the real secret,
+        performs the action, and returns only the result. The credential value never leaves the server.
+      tags:
+      - Vault v2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecuteRequest'
+      responses:
+        '200':
+          description: Action executed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecuteResponse'
+        '401':
+          description: Invalid or missing API key
+        '403':
+          description: Vault is locked
+        '404':
+          description: Handle not found
+  /vault/v2/recover:
+    post:
+      operationId: vaultRecover
+      summary: Recover vault with 12-word phrase
+      description: Recover vault access using the 12-word recovery phrase. Sets a new passphrase and unlocks the vault.
+      tags:
+      - Vault v2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecoverRequest'
+      responses:
+        '200':
+          description: Vault recovered and unlocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultSessionResponse'
+        '401':
+          description: Invalid or missing API key
+        '400':
+          description: Invalid recovery words
