@@ -1,6 +1,6 @@
 # Kova Mind REST API Reference
 
-Base URL: `https://api.kovamind.ai`
+Base URL: `https://api.kovamind.io`
 
 All endpoints require `Authorization: Bearer km_live_xxx` unless noted.
 
@@ -13,7 +13,7 @@ Extract memory patterns from a conversation.
 **Request:**
 
 ```bash
-curl -X POST https://api.kovamind.ai/memory/extract \
+curl -X POST https://api.kovamind.io/memory/extract \
   -H "Authorization: Bearer km_live_xxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -64,7 +64,7 @@ Retrieve relevant memory patterns for a context.
 **Request:**
 
 ```bash
-curl -X POST https://api.kovamind.ai/memory/retrieve \
+curl -X POST https://api.kovamind.io/memory/retrieve \
   -H "Authorization: Bearer km_live_xxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -107,7 +107,7 @@ Confirm, deny, strengthen, or weaken a stored pattern.
 **Request:**
 
 ```bash
-curl -X POST https://api.kovamind.ai/memory/reinforce \
+curl -X POST https://api.kovamind.io/memory/reinforce \
   -H "Authorization: Bearer km_live_xxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -142,7 +142,7 @@ Score how surprising new content is vs existing memories.
 **Request:**
 
 ```bash
-curl -X POST https://api.kovamind.ai/memory/surprise \
+curl -X POST https://api.kovamind.io/memory/surprise \
   -H "Authorization: Bearer km_live_xxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -175,7 +175,7 @@ Check API health. **No authentication required.**
 **Request:**
 
 ```bash
-curl https://api.kovamind.ai/health
+curl https://api.kovamind.io/health
 ```
 
 **Response:**

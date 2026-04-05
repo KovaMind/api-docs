@@ -1,6 +1,6 @@
 # Kova Mind API Documentation
 
-API reference, OpenAPI spec, and integration guides for the [Kova Mind](https://kovamind.ai) memory API.
+API reference, OpenAPI spec, and integration guides for the [Kova Mind](https://kovamind.io) memory API.
 
 ## Quick links
 
@@ -21,7 +21,7 @@ API reference, OpenAPI spec, and integration guides for the [Kova Mind](https://
 ## Base URL
 
 ```
-https://api.kovamind.ai
+https://api.kovamind.io
 ```
 
 ## Authentication
@@ -32,4 +32,4 @@ All endpoints except `/health` require a Bearer token:
 Authorization: Bearer km_live_xxxxxxxxxxxxxxxx
 ```
 
-Get your API key at [kovamind.ai](https://kovamind.ai).
+Get your API key at [kovamind.io](https://kovamind.io).

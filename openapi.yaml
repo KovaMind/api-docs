@@ -12,7 +12,7 @@ info:
     Authorization: Bearer km_live_xxxxxxxxxxxxxxxx
     ```
 
-    Get your API key at [kovamind.ai](https://kovamind.ai).
+    Get your API key at [kovamind.io](https://kovamind.io).
 
     ## Rate limits
     | Endpoint | Free | Paid |
@@ -24,12 +24,12 @@ info:
   contact:
     name: Kova Mind
     email: hello@kovamind.ai
-    url: https://kovamind.ai
+    url: https://kovamind.io
   license:
     name: MIT
 
 servers:
-  - url: https://api.kovamind.ai
+  - url: https://api.kovamind.io
     description: Production
 
 security:

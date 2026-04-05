@@ -6,7 +6,7 @@ Give any Custom GPT persistent memory across conversations using Kova Mind.
 
 ### 1. Get your API key
 
-Sign up at [kovamind.ai](https://kovamind.ai) and copy your key from **Settings > API Keys**.
+Sign up at [kovamind.io](https://kovamind.io) and copy your key from **Settings > API Keys**.
 
 ### 2. Create a new GPT
 
