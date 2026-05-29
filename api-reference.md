@@ -6,14 +6,14 @@ All endpoints require `Authorization: Bearer km_live_xxx` unless noted.
 
 ---
 
-## POST /memory/extract
+## POST /api/memory/extract
 
 Extract memory patterns from a conversation.
 
 **Request:**
 
 ```bash
-curl -X POST https://api.kovamind.io/memory/extract \
+curl -X POST https://api.kovamind.io/api/memory/extract \
   -H "Authorization: Bearer km_live_xxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -57,14 +57,14 @@ curl -X POST https://api.kovamind.io/memory/extract \
 
 ---
 
-## POST /memory/retrieve
+## POST /api/memory/retrieve
 
 Retrieve relevant memory patterns for a context.
 
 **Request:**
 
 ```bash
-curl -X POST https://api.kovamind.io/memory/retrieve \
+curl -X POST https://api.kovamind.io/api/memory/retrieve \
   -H "Authorization: Bearer km_live_xxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -100,14 +100,14 @@ curl -X POST https://api.kovamind.io/memory/retrieve \
 
 ---
 
-## POST /memory/reinforce
+## POST /api/memory/reinforce
 
 Confirm, deny, strengthen, or weaken a stored pattern.
 
 **Request:**
 
 ```bash
-curl -X POST https://api.kovamind.io/memory/reinforce \
+curl -X POST https://api.kovamind.io/api/memory/reinforce \
   -H "Authorization: Bearer km_live_xxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -135,14 +135,14 @@ curl -X POST https://api.kovamind.io/memory/reinforce \
 
 ---
 
-## POST /memory/surprise
+## POST /api/memory/surprise
 
 Score how surprising new content is vs existing memories.
 
 **Request:**
 
 ```bash
-curl -X POST https://api.kovamind.io/memory/surprise \
+curl -X POST https://api.kovamind.io/api/memory/surprise \
   -H "Authorization: Bearer km_live_xxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -212,8 +212,8 @@ All errors return:
 
 | Endpoint | Free | Paid |
 |----------|------|------|
-| `/memory/extract` | 100/day | 10,000/day |
-| `/memory/retrieve` | 200/day | 20,000/day |
-| `/memory/surprise` | 500/day | Unlimited |
+| `/api/memory/extract` | 100/day | 10,000/day |
+| `/api/memory/retrieve` | 200/day | 20,000/day |
+| `/api/memory/surprise` | 500/day | Unlimited |
 
 When rate limited, the response includes a `Retry-After` header with seconds to wait.
