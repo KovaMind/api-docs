@@ -212,8 +212,8 @@ All errors return:
 
 | Endpoint | Free | Paid |
 |----------|------|------|
-| `/memory/extract` | 100/day | 10,000/day |
-| `/memory/retrieve` | 200/day | 20,000/day |
-| `/memory/surprise` | 500/day | Unlimited |
+| `/api/memory/extract` | 100/day | 10,000/day |
+| `/api/memory/retrieve` | 200/day | 20,000/day |
+| `/api/memory/surprise` | 500/day | Unlimited |
 
 When rate limited, the response includes a `Retry-After` header with seconds to wait.
