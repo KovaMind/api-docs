@@ -223,7 +223,11 @@ An API key can be **bound** server-side to a single agent identity (one `user_id
 
 - **Unbound key:** the client-supplied `user_id` is passed through unchanged, so one key can serve many users.
 
-This lets you lock a key to a specific agent (e.g. a single deployed bot) so a leaked or misused key cannot read or write another user's memory. The memory endpoints (`/api/memory/extract`, `/api/memory/retrieve`, `/api/memory/reinforce`, `/api/memory/surprise`) all enforce this binding. Send the `user_id` that matches the key's bound identity, or use an unbound key.
+This lets you lock a key to a specific agent (e.g. a single deployed bot) so a leaked or misused key cannot read or write another user's memory.
+
+The `user_id` mismatch check only applies to endpoints that **accept a `user_id` in their body** — `/api/memory/extract`, `/api/memory/retrieve`, and `/api/memory/surprise`. On those, send the `user_id` that matches the key's bound identity (or use an unbound key), otherwise you get the `403` above.
+
+Endpoints that **don't take a `user_id`** — such as `/api/memory/reinforce` — aren't subject to the `user_id` mismatch check; they operate on a target pattern that already belongs to the key's bound identity, so there is no `user_id` to match.
 
 ---
 
