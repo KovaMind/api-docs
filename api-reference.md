@@ -194,6 +194,7 @@ curl https://api.kovamind.io/health
 | Status | Error | Description |
 |--------|-------|-------------|
 | 401 | `AuthError` | Invalid or missing API key |
+| 403 | `IdentityError` | API key is bound to a different agent identity (see [Bound API keys](#bound-api-keys)) |
 | 404 | `NotFoundError` | Pattern or resource not found |
 | 429 | `RateLimitError` | Rate limit exceeded (check `Retry-After` header) |
 | 500 | `ServerError` | Internal server error |
@@ -208,6 +209,24 @@ All errors return:
 
 ---
 
+## Bound API keys
+
+An API key can be **bound** server-side to a single agent identity (one `user_id`).
+
+- **Bound key:** if a request's `user_id` differs from the identity the key is bound to, the API returns `403`:
+
+  ```json
+  {
+    "detail": "API key is bound to a different agent identity"
+  }
+  ```
+
+- **Unbound key:** the client-supplied `user_id` is passed through unchanged, so one key can serve many users.
+
+This lets you lock a key to a specific agent (e.g. a single deployed bot) so a leaked or misused key cannot read or write another user's memory. The memory endpoints (`/api/memory/extract`, `/api/memory/retrieve`, `/api/memory/reinforce`, `/api/memory/surprise`) all enforce this binding. Send the `user_id` that matches the key's bound identity, or use an unbound key.
+
+---
+
 ## Rate Limits
 
 | Endpoint | Free | Paid |
@@ -217,3 +236,14 @@ All errors return:
 | `/api/memory/surprise` | 500/day | Unlimited |
 
 When rate limited, the response includes a `Retry-After` header with seconds to wait.
+
+---
+
+## Vault v2 (beta)
+
+The API also exposes encrypted-credential routes under `/api/vault/v2/*`, and the
+official SDKs export helpers for them. **Vault v2 is experimental** — the routes
+and their request/response shapes may change without notice and are not yet
+covered by this reference. Treat anything you build on `/api/vault/v2/*` as beta
+and pin your SDK version. Stable, fully-specified docs will follow once the
+surface settles.
