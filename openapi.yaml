@@ -268,6 +268,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '403':
+          description: API key is bound to a different agent identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: "API key is bound to a different agent identity"
         '429':
           description: Rate limit exceeded
           headers:
@@ -310,8 +318,25 @@ paths:
                     user_id: "alex"
         '401':
           description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: API key is bound to a different agent identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: "API key is bound to a different agent identity"
         '429':
           description: Rate limit exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
 
   /api/memory/reinforce:
     post:
@@ -339,6 +364,18 @@ paths:
                 $ref: '#/components/schemas/ReinforceResponse'
         '401':
           description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: API key is bound to a different agent identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: "API key is bound to a different agent identity"
         '404':
           description: Pattern not found
           content:
@@ -375,6 +412,25 @@ paths:
                 route: "contradict"
         '401':
           description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: API key is bound to a different agent identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                detail: "API key is bound to a different agent identity"
+        '429':
+          description: Rate limit exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
 
   /health:
     get:
