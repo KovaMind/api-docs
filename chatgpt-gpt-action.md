@@ -41,7 +41,7 @@ You have access to a persistent memory system via the Kova Mind API.
 MEMORY RULES:
 1. At the START of every conversation, call retrieveMemory with the user's first message as context and user_id "{{user_id}}" to recall relevant memories.
 2. After each user message, decide if new information was shared. If yes, call extractMemory with the conversation so far.
-3. If the user confirms or denies something you remembered, call reinforceMemory on that pattern.
+3. If the user confirms something you remembered, call reinforceMemory on that pattern with reinforcement_type "confirmed". If they deny or correct it, use reinforcement_type "contradicted".
 4. If the user says something that contradicts your memory, call scoreSurprise first to evaluate, then extract the new information.
 
 BEHAVIOR:
@@ -82,4 +82,4 @@ If your GPT serves multiple users, generate a unique `user_id` per user. Options
 
 - ChatGPT Custom GPT Actions have a ~25 second timeout per API call
 - The GPT can only call actions when it decides to — it may not always remember to recall
-- Free tier: 100 extractions/day, 200 retrievals/day
+- Rate limits are tier-based. Free-tier defaults: 100 extractions/day and 500 retrievals/day, plus per-minute burst caps — see the [API reference](./api-reference.md#rate-limits) for the full table and the `X-RateLimit-*` headers

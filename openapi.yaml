@@ -7,7 +7,7 @@ info:
     memory patterns from conversations.
 
     ## Authentication
-    All endpoints (except `/health`) require a Bearer token:
+    All endpoints (except `GET /health`) require a Bearer token:
     ```
     Authorization: Bearer km_live_xxxxxxxxxxxxxxxx
     ```
@@ -15,11 +15,38 @@ info:
     Get your API key at [kovamind.io](https://kovamind.io).
 
     ## Rate limits
-    | Endpoint | Free | Paid |
-    |----------|------|------|
-    | /api/memory/extract | 100/day | 10,000/day |
-    | /api/memory/retrieve | 200/day | 20,000/day |
-    | /api/memory/surprise | 500/day | Unlimited |
+    Two tier-based layers are enforced per tenant:
+
+    1. **Per-minute burst window** (60-second window, per endpoint category):
+
+       | Tier | extract | retrieve | all other endpoints |
+       |------|---------|----------|---------------------|
+       | Free | 200/min | 500/min | 1,000/min |
+       | Starter | 500/min | 1,500/min | 3,000/min |
+       | Pro | 1,000/min | 2,500/min | 5,000/min |
+       | Team | unlimited | unlimited | unlimited |
+
+    2. **Per-day quota** (UTC calendar day; defaults shown — Free and Starter
+       daily quotas can be operator-adjusted):
+
+       | Tier | extract | retrieve | surprise | all other endpoints |
+       |------|---------|----------|----------|---------------------|
+       | Free | 100/day | 500/day | 200/day | 1,000/day |
+       | Starter | 2,000/day | 10,000/day | 5,000/day | 20,000/day |
+       | Pro | 20,000/day | 100,000/day | 50,000/day | 200,000/day |
+       | Team | unlimited | unlimited | unlimited | unlimited |
+
+    Every authenticated response carries `X-RateLimit-Limit`,
+    `X-RateLimit-Remaining`, and `X-RateLimit-Reset` (unix-epoch seconds when
+    the current minute window flips) for the burst layer. Unlimited tiers see
+    the literal string `unlimited` in the limit/remaining headers.
+
+    On `429` the response includes `Retry-After` (`60` for a burst-window
+    hit, `86400` for a daily-quota hit); daily-quota 429s additionally carry
+    `X-Quota-Limit` and `X-Quota-Used`.
+
+    Customers with a dashboard session token can call `GET /api/v1/my/limits`
+    to read their live caps and current usage in JSON.
 
   contact:
     name: Kova Mind
@@ -59,65 +86,132 @@ components:
 
     Pattern:
       type: object
+      required: [pattern_id, pattern_type, content, confidence, source, created_at]
       properties:
-        id:
+        pattern_id:
           type: string
           description: Unique pattern identifier
-        pattern:
+        pattern_type:
           type: string
-          description: The extracted memory pattern text
-        category:
+          description: Type of pattern (e.g. `preference`, `entity`, `decision`, `correction`, `relationship`). Set by the extractor, not by the caller.
+        user_id:
           type: string
-          enum: [preference, entity, decision, procedure, emotion, belief, relationship]
-          description: Category of the pattern
+          nullable: true
+          description: Owner user identifier (the user this pattern belongs to)
+        content:
+          type: string
+          description: The pattern content/description
         confidence:
           type: number
           format: float
           minimum: 0
           maximum: 1
-          description: Confidence score (0.0 to 1.0)
-        user_id:
+          description: Current confidence score (0.0 to 1.0)
+        relevance:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          nullable: true
+          description: Query-relevance score (normalized hybrid vector+keyword fusion). Null when ranking did not run (e.g. on extract responses).
+        source:
           type: string
-          description: The user this pattern belongs to
-        tenant_id:
+          description: How the pattern was created (e.g. `conversation`, `manual`)
+        created_at:
           type: string
-          description: The tenant/organization this pattern belongs to
+          format: date-time
+          description: Pattern creation timestamp
+        last_reinforced:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last reinforcement timestamp
+        reinforcement_count:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Number of reinforcements
+      description: |
+        A stored memory pattern. Responses may also include additional
+        optional enrichment fields (e.g. `emotion_primary`,
+        `emotion_intensity`, `domain`, `priority_tier`, `memory_state`,
+        `record_type`) — treat unknown fields as informational.
 
     ExtractRequest:
       type: object
-      required: [conversation, user_id]
+      required: [user_id, conversation]
       properties:
+        user_id:
+          type: string
+          maxLength: 128
+          description: Unique identifier for the user whose memory is being updated
         conversation:
           type: array
+          minItems: 1
           items:
             $ref: '#/components/schemas/Message'
           description: List of conversation messages to extract patterns from
-        user_id:
-          type: string
-          description: Unique identifier for the user whose memory is being updated
         session_id:
           type: string
+          nullable: true
           description: Optional session ID for grouping extractions across multiple calls
+        app:
+          type: string
+          maxLength: 64
+          nullable: true
+          description: Optional originating app name (e.g. `vscode`, `cursor`). Free-form; used for usage attribution.
+        tags:
+          type: array
+          maxItems: 32
+          items:
+            type: string
+          nullable: true
+          description: Optional free-form tags attached to every pattern extracted from this conversation
 
     ExtractResponse:
       type: object
+      required: [patterns_extracted, patterns]
       properties:
+        patterns_extracted:
+          type: integer
+          minimum: 0
+          description: Number of patterns extracted on this call
         patterns:
           type: array
           items:
             $ref: '#/components/schemas/Pattern'
-          description: List of extracted memory patterns
+          description: The extracted memory patterns
+        decisions_found:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Number of decisions found
+        corrections_found:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Number of corrections found
+        processing_time_ms:
+          type: number
+          format: float
+          nullable: true
+          description: Processing time in milliseconds
+        consolidation_pending:
+          type: boolean
+          default: false
+          description: True when this extract triggered a background consolidation pass. Callers can use this to decide whether to wait before retrieving consolidated insights.
 
     RetrieveRequest:
       type: object
-      required: [context, user_id]
+      required: [user_id, context]
       properties:
+        user_id:
+          type: string
+          maxLength: 128
+          description: The user whose memory to search
         context:
           type: string
           description: Natural language context or query to search memories for
-        user_id:
-          type: string
-          description: The user whose memory to search
         max_patterns:
           type: integer
           minimum: 1
@@ -129,17 +223,143 @@ components:
           format: float
           minimum: 0
           maximum: 1
-          default: 0.3
+          default: 0.1
           description: Minimum confidence threshold for returned patterns
+        pattern_type:
+          type: string
+          nullable: true
+          description: Filter by pattern type (e.g. `entity`, `preference`)
+        include_tiers:
+          type: boolean
+          default: false
+          description: When true, populate the `tiers` field in the response (tiered retrieval)
+        token_budget:
+          type: integer
+          minimum: 100
+          maximum: 10000
+          default: 2000
+          description: Token budget for tiered retrieval (honored when `include_tiers=true`)
+
+    Decision:
+      type: object
+      required: [decision_id, content, context, timestamp, confidence]
+      properties:
+        decision_id:
+          type: string
+        content:
+          type: string
+        context:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+
+    Milestone:
+      type: object
+      required: [milestone_id, title, description, achieved_at, importance]
+      properties:
+        milestone_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        achieved_at:
+          type: string
+          format: date-time
+        importance:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
 
     RetrieveResponse:
       type: object
+      required: [patterns, retrieval_time_ms]
       properties:
         patterns:
           type: array
           items:
             $ref: '#/components/schemas/Pattern'
-          description: List of relevant memory patterns, ranked by relevance
+          description: Retrieved patterns, ranked by relevance
+        decisions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Decision'
+          description: Relevant decisions
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/Milestone'
+          description: Relevant milestones
+        retrieval_time_ms:
+          type: number
+          format: float
+          description: Retrieval time in milliseconds
+        total_matches:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Total matches found
+        episodic:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pattern'
+          description: Episodic fragments that matched the query (kept separate from `patterns`)
+        injection_text:
+          type: string
+          nullable: true
+          description: Pre-formatted injection string for direct LLM prompt use
+        token_budget_used:
+          type: integer
+          nullable: true
+          description: Tokens consumed by retrieval results
+        tiers:
+          type: object
+          nullable: true
+          description: Tiered retrieval results (only when `include_tiers=true`); keys `core`, `active`, `contextual`, `background`, each an array of Pattern
+        degraded:
+          type: boolean
+          default: false
+          description: True when an internal retrieval stage failed and partial/scrubbed results were returned
+        degraded_reasons:
+          type: array
+          items:
+            type: string
+          description: Short reason codes for each degraded stage (e.g. `qdrant_timeout`, `emotional_ranker_error`)
+        stale_flags:
+          type: array
+          nullable: true
+          items:
+            type: object
+          description: Patterns flagged as rusty or stale-conflicted
+        conflicts:
+          type: array
+          nullable: true
+          items:
+            type: object
+          description: Detected contradictions between recalled patterns
+        media_results:
+          type: array
+          nullable: true
+          items:
+            type: object
+          description: Cross-modal media results (images, audio, documents), when present
+        confidence_warnings:
+          type: array
+          nullable: true
+          items:
+            type: object
+          description: Feeling-of-knowing signals — conflicting patterns, low-confidence areas, or stale data
+        proactive_suggestions:
+          type: object
+          nullable: true
+          description: Proactive suggestions — contradictions found, old reminders, pre-warm hints
 
     ReinforceRequest:
       type: object
@@ -147,74 +367,230 @@ components:
       properties:
         pattern_id:
           type: string
-          description: The ID of the pattern to reinforce
+          description: The ID of the pattern to reinforce (numeric string, e.g. `"42"`)
         reinforcement_type:
           type: string
-          enum: [confirmed, denied, strengthened, weakened]
+          enum: [confirmed, contradicted, used]
           description: |
             Type of reinforcement:
-            - `confirmed`: User validated this pattern is correct
-            - `denied`: User said this pattern is wrong
-            - `strengthened`: Increase confidence
-            - `weakened`: Decrease confidence
+            - `confirmed`: the user validated this pattern is correct (confidence +0.10)
+            - `contradicted`: the user pushed back / said this pattern is wrong (confidence -0.15)
+            - `used`: your agent surfaced this pattern and the user did not push back (confidence +0.05)
         context:
           type: string
+          nullable: true
           description: Optional explanation for the reinforcement
 
     ReinforceResponse:
       type: object
+      required: [pattern_id, previous_confidence, new_confidence, reinforcement_type]
       properties:
         pattern_id:
           type: string
-        type:
+          description: Pattern identifier
+        previous_confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confidence before this reinforcement
+        new_confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confidence after this reinforcement
+        reinforcement_type:
           type: string
-        success:
-          type: boolean
+          enum: [confirmed, contradicted, used]
+          description: Reinforcement type applied
+        timestamp:
+          type: string
+          format: date-time
+          description: Reinforcement timestamp
 
     SurpriseRequest:
       type: object
-      required: [content, user_id]
+      required: [user_id, content]
       properties:
-        content:
-          type: string
-          description: The new content to evaluate for novelty
         user_id:
           type: string
+          maxLength: 128
           description: The user whose memory to compare against
+        content:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: The new content to evaluate for novelty
 
     SurpriseResponse:
       type: object
+      required: [user_id, content, surprise_score, route, thresholds]
       properties:
+        user_id:
+          type: string
+          description: The user the content was scored against
+        content:
+          type: string
+          description: Echo of the scored content, truncated to the first 100 characters
         surprise_score:
           type: number
           format: float
           minimum: 0
           maximum: 1
           description: |
-            How novel the content is (0.0 to 1.0):
-            - < 0.3: Already known (reinforce)
-            - 0.3–0.7: New information (update)
-            - > 0.7: Contradicts existing memory (contradict)
+            How novel the content is (0.0 to 1.0), rounded to 4 decimals:
+            - below `thresholds.reinforce_below` (default 0.3): already known (route `reinforce`)
+            - between the thresholds: new information (route `update`)
+            - at or above `thresholds.contradict_above` (default 0.7): contradicts existing memory (route `contradict`)
         route:
           type: string
           enum: [reinforce, update, contradict]
-          description: Recommended action based on surprise score
+          description: Recommended action based on the surprise score
+        thresholds:
+          type: object
+          required: [reinforce_below, contradict_above]
+          properties:
+            reinforce_below:
+              type: number
+              format: float
+              description: Scores below this route to `reinforce` (server default 0.3)
+            contradict_above:
+              type: number
+              format: float
+              description: Scores at or above this route to `contradict` (server default 0.7)
+          description: The routing thresholds the server used for this call
+
+    EmotionContextResponse:
+      type: object
+      required: [conversation_id, emotions, dominant_emotion, sentiment]
+      properties:
+        conversation_id:
+          type: string
+          description: Conversation identifier echoed from the request
+        emotions:
+          type: object
+          additionalProperties:
+            type: number
+            format: float
+            minimum: 0
+            maximum: 1
+          description: Detected emotion → intensity (0.0–1.0). May be empty when the conversation has no recorded emotional signal yet.
+        dominant_emotion:
+          type: string
+          description: The highest-intensity emotion (or `neutral` if none)
+        sentiment:
+          type: string
+          enum: [positive, neutral, negative]
+          description: Overall sentiment for the conversation
 
     HealthResponse:
       type: object
+      required: [status, version, database, routers_mounted]
       properties:
         status:
           type: string
-          enum: [ok, degraded, down]
+          enum: [healthy, degraded]
+          description: Overall service status
         version:
           type: string
+          description: API version
+        database:
+          type: string
+          enum: [ok, degraded]
+          description: Database health
+        missing_tables:
+          type: array
+          items:
+            type: string
+          description: Present only when expected database tables are missing
+        routers_mounted:
+          type: object
+          additionalProperties:
+            type: boolean
+          description: Which subsystem routers are mounted (`memory`, `vault`, `auditor`, `inside_out`, `webhook`, `emotions`)
 
     Error:
       type: object
+      required: [detail]
       properties:
         detail:
-          type: string
-          description: Human-readable error message
+          description: Human-readable error message (string), or an array of validation error objects on 422
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object
+
+  responses:
+    Unauthorized:
+      description: Invalid or missing API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missing:
+              value:
+                detail: "Authorization header required"
+            invalid:
+              value:
+                detail: "Invalid or revoked API key"
+    BoundKeyForbidden:
+      description: API key is bound to a different agent identity (see the Bound API keys section of the API reference)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: "API key is bound to a different agent identity"
+    ValidationError:
+      description: Request body failed validation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: |
+        Rate limit exceeded. A burst-window 429 carries `Retry-After: 60`
+        plus the `X-RateLimit-*` headers; a daily-quota 429 carries
+        `Retry-After: 86400` plus `X-Quota-Limit` and `X-Quota-Used`.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying (60 for burst, 86400 for daily quota)
+        X-RateLimit-Limit:
+          schema:
+            type: string
+          description: Per-minute burst limit for your tier (burst 429s; `unlimited` for uncapped tiers)
+        X-RateLimit-Remaining:
+          schema:
+            type: string
+          description: Requests remaining in the current minute window (burst 429s)
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Unix-epoch seconds when the current minute window resets (burst 429s)
+        X-Quota-Limit:
+          schema:
+            type: integer
+          description: Daily quota for your tier (daily-quota 429s only)
+        X-Quota-Used:
+          schema:
+            type: integer
+          description: Calls used today (daily-quota 429s only)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            burst:
+              value:
+                detail: "Rate limit exceeded (burst)"
+            daily:
+              value:
+                detail: "Daily quota exceeded (105/100 for tier='free'). Upgrade at kovamind.io"
 
 paths:
   /api/memory/extract:
@@ -223,8 +599,13 @@ paths:
       summary: Extract memory patterns from a conversation
       description: |
         Parses conversation messages and extracts structured memory patterns
-        (preferences, entities, decisions, procedures, emotions, etc.).
-        Patterns are stored and associated with the given user_id.
+        (preferences, entities, decisions, corrections, relationships).
+        Patterns are stored under the authenticated tenant and associated
+        with the given `user_id`.
+
+        Patterns the system already knows with high confidence are reinforced
+        rather than re-stored — the response counters reflect what was
+        actually stored on this call.
       requestBody:
         required: true
         content:
@@ -240,49 +621,44 @@ paths:
               user_id: "alex"
       responses:
         '200':
-          description: Patterns extracted successfully
+          description: Patterns extracted (zero or more)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExtractResponse'
               example:
+                patterns_extracted: 2
                 patterns:
-                  - id: "42"
-                    pattern: "prefers dark mode"
-                    category: "preference"
+                  - pattern_id: "42"
+                    pattern_type: "preference"
+                    user_id: "alex"
+                    content: "prefers dark mode"
                     confidence: 0.95
+                    source: "conversation"
+                    created_at: "2026-08-01T10:30:00Z"
+                    last_reinforced: null
+                    reinforcement_count: 0
+                  - pattern_id: "43"
+                    pattern_type: "preference"
                     user_id: "alex"
-                  - id: "43"
-                    pattern: "dislikes Comic Sans"
-                    category: "preference"
+                    content: "dislikes Comic Sans"
                     confidence: 0.90
-                    user_id: "alex"
-                  - id: "44"
-                    pattern: "lives in Miami"
-                    category: "entity"
-                    confidence: 0.92
-                    user_id: "alex"
+                    source: "conversation"
+                    created_at: "2026-08-01T10:30:00Z"
+                    last_reinforced: null
+                    reinforcement_count: 0
+                decisions_found: 0
+                corrections_found: 0
+                processing_time_ms: 125.5
+                consolidation_pending: false
         '401':
-          description: Invalid or missing API key
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: API key is bound to a different agent identity
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                detail: "API key is bound to a different agent identity"
+          $ref: '#/components/responses/BoundKeyForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
         '429':
-          description: Rate limit exceeded
-          headers:
-            Retry-After:
-              schema:
-                type: integer
-              description: Seconds to wait before retrying
+          $ref: '#/components/responses/RateLimited'
 
   /api/memory/retrieve:
     post:
@@ -290,7 +666,13 @@ paths:
       summary: Retrieve relevant memory patterns
       description: |
         Search stored memory patterns using natural language context.
-        Returns the most relevant patterns ranked by similarity and confidence.
+        Returns the most relevant patterns ranked by semantic similarity and
+        confidence, scoped to the authenticated tenant and the supplied
+        `user_id`.
+
+        A `GET /api/memory/retrieve` form with the same fields as query
+        parameters also exists; POST is canonical (long context strings
+        exceed URL length limits).
       requestBody:
         required: true
         content:
@@ -304,47 +686,50 @@ paths:
               min_confidence: 0.5
       responses:
         '200':
-          description: Relevant patterns retrieved
+          description: Ranked patterns + retrieval metadata
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/RetrieveResponse'
               example:
                 patterns:
-                  - id: "42"
-                    pattern: "prefers dark mode"
-                    category: "preference"
-                    confidence: 0.95
+                  - pattern_id: "42"
+                    pattern_type: "preference"
                     user_id: "alex"
+                    content: "prefers dark mode"
+                    confidence: 0.95
+                    relevance: 0.87
+                    source: "conversation"
+                    created_at: "2026-08-01T10:30:00Z"
+                    last_reinforced: "2026-08-02T09:00:00Z"
+                    reinforcement_count: 3
+                decisions: []
+                milestones: []
+                episodic: []
+                retrieval_time_ms: 45.2
+                total_matches: 1
+                degraded: false
+                degraded_reasons: []
         '401':
-          description: Invalid or missing API key
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: API key is bound to a different agent identity
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                detail: "API key is bound to a different agent identity"
+          $ref: '#/components/responses/BoundKeyForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
         '429':
-          description: Rate limit exceeded
-          headers:
-            Retry-After:
-              schema:
-                type: integer
-              description: Seconds to wait before retrying
+          $ref: '#/components/responses/RateLimited'
 
   /api/memory/reinforce:
     post:
       operationId: reinforceMemory
-      summary: Reinforce or deny a stored pattern
+      summary: Reinforce, contradict, or mark a stored pattern as used
       description: |
-        Confirm, deny, strengthen, or weaken a previously stored memory pattern.
-        Use this when a user explicitly validates or contradicts a memory.
+        Adjust the confidence of a previously stored memory pattern based on
+        real-world feedback: `confirmed` (+0.10, capped at 1.0),
+        `contradicted` (-0.15, floored at 0.0), or `used` (+0.05, capped at
+        1.0). Use `confirmed`/`contradicted` when a user explicitly validates
+        or rejects a memory, and `used` when your agent surfaced the pattern
+        without pushback.
       requestBody:
         required: true
         content:
@@ -357,40 +742,47 @@ paths:
               context: "User explicitly confirmed they prefer dark mode"
       responses:
         '200':
-          description: Pattern reinforced successfully
+          description: Confidence adjusted
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReinforceResponse'
-        '401':
-          description: Invalid or missing API key
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '403':
-          description: API key is bound to a different agent identity
+              example:
+                pattern_id: "42"
+                previous_confidence: 0.75
+                new_confidence: 0.85
+                reinforcement_type: "confirmed"
+                timestamp: "2026-08-01T10:30:00Z"
+        '400':
+          description: Invalid pattern_id format (must be a numeric string)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                detail: "API key is bound to a different agent identity"
+                detail: "Invalid pattern_id format"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           description: Pattern not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /api/memory/surprise:
     post:
       operationId: scoreSurprise
       summary: Score how surprising new content is
       description: |
-        Evaluate how novel or contradictory new content is compared to existing
-        memories for a user. High scores indicate the content contradicts stored
-        knowledge; low scores indicate it reinforces what's already known.
+        Evaluate how novel or contradictory new content is compared to a
+        user's existing memories. High scores indicate the content
+        contradicts stored knowledge; low scores indicate it reinforces
+        what's already known. JSON body only.
       requestBody:
         required: true
         content:
@@ -408,35 +800,68 @@ paths:
               schema:
                 $ref: '#/components/schemas/SurpriseResponse'
               example:
-                surprise_score: 0.82
+                user_id: "alex"
+                content: "Alex now prefers light mode"
+                surprise_score: 0.8215
                 route: "contradict"
+                thresholds:
+                  reinforce_below: 0.3
+                  contradict_above: 0.7
         '401':
-          description: Invalid or missing API key
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: API key is bound to a different agent identity
+          $ref: '#/components/responses/BoundKeyForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/memory/context:
+    get:
+      operationId: getMemoryContext
+      summary: Emotion context for a conversation
+      description: |
+        Return the emotion context for a conversation: detected emotions and
+        their intensities, the dominant emotion, and an overall `sentiment`
+        label (`positive` / `neutral` / `negative`). Customer SDKs call this
+        after each turn so a host application can branch UI on `sentiment`.
+      parameters:
+        - in: query
+          name: conversation_id
+          required: true
+          schema:
+            type: string
+            maxLength: 128
+          description: Conversation identifier
+      responses:
+        '200':
+          description: Emotion context for the conversation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/EmotionContextResponse'
               example:
-                detail: "API key is bound to a different agent identity"
+                conversation_id: "conv-123"
+                emotions:
+                  joy: 0.8
+                dominant_emotion: "joy"
+                sentiment: "positive"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
         '429':
-          description: Rate limit exceeded
-          headers:
-            Retry-After:
-              schema:
-                type: integer
-              description: Seconds to wait before retrying
+          $ref: '#/components/responses/RateLimited'
 
   /health:
     get:
       operationId: healthCheck
       summary: Check API health
-      description: Returns the current health status of the API. No authentication required.
+      description: |
+        Returns the current health status of the API. No authentication
+        required. Returns `200` when healthy; `503` (with the same JSON
+        shape) when the database or the memory subsystem is down. Also
+        available at `/api/health` (identical payload).
       security: []
       responses:
         '200':
@@ -446,5 +871,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
               example:
-                status: "ok"
+                status: "healthy"
                 version: "1.0.0"
+                database: "ok"
+                routers_mounted:
+                  memory: true
+                  vault: true
+                  auditor: true
+                  inside_out: true
+                  webhook: true
+                  emotions: true
+        '503':
+          description: One or more critical subsystems are down
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
