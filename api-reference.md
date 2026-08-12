@@ -9,7 +9,7 @@ All endpoints require `Authorization: Bearer km_live_xxx` unless noted.
 > archive search, sessions, usage/limits, and more) that are not yet covered
 > here — they are real and in production use, but their request/response
 > shapes are documented only in the interactive docs at
-> `https://api.kovamind.io/docs` until this reference catches up.
+> `https://api.kovamind.io/api/docs` until this reference catches up.
 
 ---
 

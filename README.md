@@ -14,8 +14,8 @@ API reference, OpenAPI spec, and integration guides for the [Kova Mind](https://
 
 | Language | Package | Install |
 |----------|---------|---------|
-| Python | [kovamind](https://github.com/KovaMind/python-sdk) | `pip install kovamind` |
-| Node.js/TypeScript | [kovamind](https://github.com/KovaMind/js-sdk) | `npm install kovamind` |
+| Python | [python-sdk](https://github.com/KovaMind/python-sdk) | See the repo — the PyPI release is being refreshed |
+| Node.js/TypeScript | [@kovamind/js-sdk](https://github.com/KovaMind/js-sdk) | `npm install @kovamind/js-sdk` |
 | MCP (Claude, Cursor, VS Code) | [@kovamind/mcp-server](https://github.com/KovaMind/mcp-server) | `npx @kovamind/mcp-server` |
 
 ## Base URL
